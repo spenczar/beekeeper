@@ -5,6 +5,9 @@ use std::vec::Vec;
 
 const WORDS_FILE_PATH: &str = "/usr/share/dict/words";
 
+// Words must be at least 4 characters long to be valid answers.
+const MIN_LENGTH: usize = 4;
+
 /// Load all the words from the unix dictionary.
 fn load_dictionary() -> io::Result<Vec<String>> {
     let file = File::open(WORDS_FILE_PATH)?;
@@ -55,10 +58,62 @@ impl Puzzle {
     }
 }
 
+// Solvers //
+struct NaiveSolver {
+    words: Vec<String>,
+}
+
+impl NaiveSolver {
+    fn new(word_list: Vec<String>) -> NaiveSolver {
+        NaiveSolver{
+            words: word_list.iter()
+                .filter(|w| w.len() >= MIN_LENGTH)
+                .cloned()
+                .collect(),
+        }
+    }
+
+    fn word_is_valid(&self, puzzle: &Puzzle, word: &str) -> bool {
+        let mut has_center = false;
+        for c in word.chars() {
+            if c == puzzle.center_letter {
+                has_center = true;
+            } else {
+                if !puzzle.outer_letters.contains(&c) {
+                    return false;
+                }
+            }
+        }
+        return has_center;
+    }
+    fn solve(&self, puzzle: &Puzzle) -> Vec<String> {
+        let mut result: Vec<String> = Vec::new();
+
+        for word in self.words.iter() {
+            if word.len() < MIN_LENGTH {
+                continue
+            }
+            if self.word_is_valid(puzzle, word) {
+                result.push(word.to_string())
+            }
+        }
+
+        result
+
+    }
+}
+
 fn main() {
     let dictionary = load_dictionary().unwrap();
-    println!("There are {} words in the dictionary.", dictionary.len());
+    let naive = NaiveSolver::new(dictionary);
 
     let puzzle = load_puzzle_from_file("puzzle.txt").unwrap();
     println!("Puzzle: {}", puzzle.to_string());
+
+    let valid = naive.solve(&puzzle);
+    println!("valid words:");
+    for word in valid.iter() {
+        println!("{}", word);
+    }
+
 }
