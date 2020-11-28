@@ -452,22 +452,8 @@ fn main() {
     let trie = RadixTrieSolver::new(dictionary.clone());
     println!("building bitmask");
     let bitmask = BitmaskSolver::new(dictionary.clone());
-    println!("building blockwise bitmask: 1");
-    let bitmask_block_1 = BitmaskBlockSolver::new(dictionary.clone(), 1);
-    println!("building blockwise bitmask: 5");
-    let bitmask_block_5 = BitmaskBlockSolver::new(dictionary.clone(), 5);
-    println!("building blockwise bitmask: 10");
-    let bitmask_block_10 = BitmaskBlockSolver::new(dictionary.clone(), 10);
-    println!("building blockwise bitmask: 20");
-    let bitmask_block_20 = BitmaskBlockSolver::new(dictionary.clone(), 20);
-    println!("building blockwise bitmask: 50");
-    let bitmask_block_50 = BitmaskBlockSolver::new(dictionary.clone(), 50);
-    println!("building blockwise bitmask: 100");
-    let bitmask_block_100 = BitmaskBlockSolver::new(dictionary.clone(), 100);
-    println!("building blockwise bitmask: 200");
-    let bitmask_block_200 = BitmaskBlockSolver::new(dictionary.clone(), 200);
-    println!("building blockwise bitmask: 1000");
-    let bitmask_block_1000 = BitmaskBlockSolver::new(dictionary.clone(), 1000);
+    println!("building blockwise bitmask (50-size blocks)");
+    let bitmask_block = BitmaskBlockSolver::new(dictionary.clone(), 50);
 
     let puzzle = load_puzzle_from_file("puzzle.txt").unwrap();
     println!("Puzzle: {}", puzzle.to_string());
@@ -475,12 +461,5 @@ fn main() {
     benchmark_solver("naive", &naive, &puzzle);
     benchmark_solver("trie", &trie, &puzzle);
     benchmark_solver("bitmask", &bitmask, &puzzle);
-    benchmark_solver("bitmask-block-1", &bitmask_block_1, &puzzle);
-    benchmark_solver("bitmask-block-5", &bitmask_block_5, &puzzle);
-    benchmark_solver("bitmask-block-10", &bitmask_block_10, &puzzle);
-    benchmark_solver("bitmask-block-20", &bitmask_block_20, &puzzle);
-    benchmark_solver("bitmask-block-50", &bitmask_block_50, &puzzle);
-    benchmark_solver("bitmask-block-100", &bitmask_block_100, &puzzle);
-    benchmark_solver("bitmask-block-200", &bitmask_block_200, &puzzle);
-    benchmark_solver("bitmask-block-1000", &bitmask_block_1000, &puzzle);
+    benchmark_solver("bitmask-block", &bitmask_block, &puzzle);
 }
