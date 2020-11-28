@@ -1,8 +1,8 @@
-use std::fs::{File, read_to_string};
+use std::collections::HashMap;
+use std::fs::{read_to_string, File};
 use std::io;
 use std::io::BufRead;
 use std::vec::Vec;
-use std::collections::HashMap;
 
 use chrono;
 
@@ -35,14 +35,7 @@ fn load_puzzle_from_file(path: &str) -> io::Result<Puzzle> {
     let chars: Vec<char> = raw.chars().collect();
     let p = Puzzle {
         center_letter: chars[0],
-        outer_letters: [
-            chars[1],
-            chars[2],
-            chars[3],
-            chars[4],
-            chars[5],
-            chars[6],
-        ],
+        outer_letters: [chars[1], chars[2], chars[3], chars[4], chars[5], chars[6]],
     };
     Ok(p)
 }
@@ -53,28 +46,28 @@ pub fn human_time(duration: chrono::Duration) -> String {
             "{seconds}.{milliseconds:03}s",
             seconds = duration.num_seconds(),
             milliseconds = duration.num_milliseconds()
-        )
+        );
     } else if duration.num_milliseconds() > 99 {
         return format!(
             "{milliseconds}ms",
             milliseconds = duration.num_milliseconds()
-        )
+        );
     } else if duration.num_milliseconds() >= 1 {
         return format!(
             "{milliseconds}.{microseconds:03}ms",
             milliseconds = duration.num_milliseconds(),
             microseconds = duration.num_microseconds().expect("microsecond overflow"),
-        )
+        );
     } else if duration.num_microseconds().expect("microsecond overflow") >= 1 {
         return format!(
             "{microseconds}μs",
             microseconds = duration.num_microseconds().expect("microsecond overflow"),
-        )
+        );
     } else {
         return format!(
             "{nanoseconds}ns",
             nanoseconds = duration.num_nanoseconds().expect("nanosecond overflow"),
-        )
+        );
     }
 }
 
@@ -106,8 +99,9 @@ struct NaiveSolver {
 
 impl NaiveSolver {
     fn new(word_list: Vec<String>) -> NaiveSolver {
-        NaiveSolver{
-            words: word_list.iter()
+        NaiveSolver {
+            words: word_list
+                .iter()
                 .filter(|w| w.len() >= MIN_LENGTH)
                 .cloned()
                 .collect(),
@@ -135,7 +129,7 @@ impl Solver for NaiveSolver {
 
         for word in self.words.iter() {
             if word.len() < MIN_LENGTH {
-                continue
+                continue;
             }
             if self.word_is_valid(puzzle, word) {
                 result.push(word.to_string())
@@ -148,7 +142,6 @@ impl Solver for NaiveSolver {
 
 struct RadixTrieSolver {
     dictionary: RadixTrieNode,
-
 }
 impl RadixTrieSolver {
     fn new(word_list: Vec<String>) -> RadixTrieSolver {
@@ -156,47 +149,13 @@ impl RadixTrieSolver {
         for word in word_list.iter() {
             root.add(word.clone());
         }
-        RadixTrieSolver{
-            dictionary: root,
-        }
+        RadixTrieSolver { dictionary: root }
     }
 }
 impl Solver for RadixTrieSolver {
     fn solve(&self, puzzle: &Puzzle) -> Vec<String> {
-        find_words(&self.dictionary, puzzle, 0, "")
+        self.dictionary.find_words(puzzle, 0, "")
     }
-}
-
-/// Finds all the words that match a puzzle for the given graph. Used
-/// recursively, with state captured in the 'path' and 'so_far' variables.
-///
-/// graph should be a node to visit in the radix trie.
-/// puzzle should be the puzzle to be solved.
-/// path should be a String indicating the current set of letters visited, in order, including the current node's letter.
-fn find_words(graph: &RadixTrieNode, puzzle: &Puzzle, center_letter_count: u32, path: &str) -> Vec<String> {
-    let mut result = Vec::new();
-
-    if center_letter_count > 0 && graph.is_word && path.len() >= MIN_LENGTH{
-        result.push(path.to_string());
-    }
-
-    let mut subpath = path.to_string();
-    if let Some(child) = graph.children.get(&puzzle.center_letter) {
-        subpath.push(puzzle.center_letter);
-        let child_words = &mut find_words(child, puzzle, center_letter_count + 1, &subpath);
-        result.append(child_words);
-        subpath.pop();
-    }
-    for letter in puzzle.outer_letters.iter() {
-        if let Some(child) = graph.children.get(&letter) {
-            subpath.push(*letter);
-            let child_words = &mut find_words(child, puzzle, center_letter_count, &subpath);
-            result.append(child_words);
-            subpath.pop();
-        }
-    }
-
-    result
 }
 
 struct RadixTrieNode {
@@ -206,7 +165,7 @@ struct RadixTrieNode {
 
 impl RadixTrieNode {
     fn new(is_word: bool) -> RadixTrieNode {
-        RadixTrieNode{
+        RadixTrieNode {
             is_word: is_word,
             children: HashMap::new(),
         }
@@ -234,6 +193,37 @@ impl RadixTrieNode {
         }
     }
 
+    /// Finds all the words that match a puzzle for the given graph. Used
+    /// recursively, with state captured in the 'path' and 'so_far' variables.
+    ///
+    /// graph should be a node to visit in the radix trie. puzzle should be the
+    /// puzzle to be solved. path should be a String indicating the current set
+    /// of letters visited, in order, including the current node's letter.
+    fn find_words(&self, puzzle: &Puzzle, center_letter_count: u32, path: &str) -> Vec<String> {
+        let mut result = Vec::new();
+
+        if center_letter_count > 0 && self.is_word && path.len() >= MIN_LENGTH {
+            result.push(path.to_string());
+        }
+
+        let mut subpath = path.to_string();
+        if let Some(child) = self.children.get(&puzzle.center_letter) {
+            subpath.push(puzzle.center_letter);
+            let child_words = &mut child.find_words(puzzle, center_letter_count + 1, &subpath);
+            result.append(child_words);
+            subpath.pop();
+        }
+        for letter in puzzle.outer_letters.iter() {
+            if let Some(child) = self.children.get(&letter) {
+                subpath.push(*letter);
+                let child_words = &mut child.find_words(puzzle, center_letter_count, &subpath);
+                result.append(child_words);
+                subpath.pop();
+            }
+        }
+
+        result
+    }
 }
 
 struct BitmapSolver {
@@ -241,13 +231,15 @@ struct BitmapSolver {
     words: Vec<String>,
 }
 
-impl BitmapSolver{
+impl BitmapSolver {
     fn new(dictionary: Vec<String>) -> BitmapSolver {
-        let bitmasks = dictionary.iter().map(
-            |s| BitmapSolver::bitmask_word(s)
-        ).collect();
+        let mut bitmasks = vec![0; dictionary.len()];
 
-        BitmapSolver{
+        for (idx, word) in dictionary.iter().enumerate() {
+            bitmasks[idx] = BitmapSolver::bitmask_word(word);
+        }
+
+        BitmapSolver {
             bitmasks: bitmasks,
             words: dictionary,
         }
@@ -345,7 +337,9 @@ fn main() {
     let puzzle = load_puzzle_from_file("puzzle.txt").unwrap();
     println!("Puzzle: {}", puzzle.to_string());
 
-    benchmark_solver("naive", &naive, &puzzle);
-    benchmark_solver("trie", &trie, &puzzle);
-    benchmark_solver("bitmask", &bitmask, &puzzle);
+    for _ in 1..100 {
+        benchmark_solver("naive", &naive, &puzzle);
+        benchmark_solver("trie", &trie, &puzzle);
+        benchmark_solver("bitmask", &bitmask, &puzzle);
+    }
 }
