@@ -236,6 +236,93 @@ impl RadixTrieNode {
 
 }
 
+struct BitmapSolver {
+    bitmasks: Vec<u32>,
+    words: Vec<String>,
+}
+
+impl BitmapSolver{
+    fn new(dictionary: Vec<String>) -> BitmapSolver {
+        let bitmasks = dictionary.iter().map(
+            |s| BitmapSolver::bitmask_word(s)
+        ).collect();
+
+        BitmapSolver{
+            bitmasks: bitmasks,
+            words: dictionary,
+        }
+    }
+
+    fn bitmask_letter(letter: &char) -> u32 {
+        match letter {
+            'a' => 1 << 0,
+            'b' => 1 << 1,
+            'c' => 1 << 2,
+            'd' => 1 << 3,
+            'e' => 1 << 4,
+            'f' => 1 << 5,
+            'g' => 1 << 6,
+            'h' => 1 << 7,
+            'i' => 1 << 8,
+            'j' => 1 << 9,
+            'k' => 1 << 10,
+            'l' => 1 << 11,
+            'm' => 1 << 12,
+            'n' => 1 << 13,
+            'o' => 1 << 14,
+            'p' => 1 << 15,
+            'q' => 1 << 16,
+            'r' => 1 << 17,
+            's' => 1 << 18,
+            't' => 1 << 19,
+            'u' => 1 << 20,
+            'v' => 1 << 21,
+            'w' => 1 << 22,
+            'x' => 1 << 23,
+            'y' => 1 << 24,
+            'z' => 1 << 25,
+            _ => 1 << 26,
+        }
+    }
+
+    fn bitmask_word(word: &str) -> u32 {
+        let mut chars: Vec<char> = word.chars().collect();
+        chars.sort();
+        chars.dedup();
+        let mut mask: u32 = 0;
+        for c in chars.iter() {
+            mask |= BitmapSolver::bitmask_letter(c);
+        }
+        mask
+    }
+}
+
+impl Solver for BitmapSolver {
+    fn solve(&self, puzzle: &Puzzle) -> Vec<String> {
+        let center_letter_mask = BitmapSolver::bitmask_letter(&puzzle.center_letter);
+
+        // forbidden_letter_mask has 1 for every letter which must *not* be
+        // used. We compute it by ORing together all the allowed words, and then
+        // inverting.
+        let mut forbidden_letter_mask: u32 = center_letter_mask;
+        for letter in puzzle.outer_letters.iter() {
+            forbidden_letter_mask |= BitmapSolver::bitmask_letter(letter)
+        }
+        forbidden_letter_mask = !forbidden_letter_mask;
+
+        let mut result: Vec<String> = Vec::new();
+        for (idx, mask) in self.bitmasks.iter().enumerate() {
+            if (mask & center_letter_mask != 0) && (mask & forbidden_letter_mask == 0) {
+                if self.words[idx].len() >= MIN_LENGTH {
+                    result.push(self.words[idx].to_string());
+                }
+            }
+        }
+
+        result
+    }
+}
+
 fn benchmark_solver(label: &str, solver: &impl Solver, puzzle: &Puzzle) {
     println!("running {} solver", label);
     let start = chrono::offset::Utc::now();
@@ -248,12 +335,17 @@ fn benchmark_solver(label: &str, solver: &impl Solver, puzzle: &Puzzle) {
 
 fn main() {
     let dictionary = load_dictionary().unwrap();
+    println!("building native");
     let naive = NaiveSolver::new(dictionary.clone());
+    println!("building radix");
     let trie = RadixTrieSolver::new(dictionary.clone());
+    println!("building bitmask");
+    let bitmask = BitmapSolver::new(dictionary.clone());
 
     let puzzle = load_puzzle_from_file("puzzle.txt").unwrap();
     println!("Puzzle: {}", puzzle.to_string());
 
     benchmark_solver("naive", &naive, &puzzle);
     benchmark_solver("trie", &trie, &puzzle);
+    benchmark_solver("bitmask", &bitmask, &puzzle);
 }
