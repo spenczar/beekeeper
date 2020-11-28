@@ -226,20 +226,20 @@ impl RadixTrieNode {
     }
 }
 
-struct BitmapSolver {
+struct BitmaskSolver {
     bitmasks: Vec<u32>,
     words: Vec<String>,
 }
 
-impl BitmapSolver {
-    fn new(dictionary: Vec<String>) -> BitmapSolver {
+impl BitmaskSolver {
+    fn new(dictionary: Vec<String>) -> BitmaskSolver {
         let mut bitmasks = vec![0; dictionary.len()];
 
         for (idx, word) in dictionary.iter().enumerate() {
-            bitmasks[idx] = BitmapSolver::bitmask_word(word);
+            bitmasks[idx] = BitmaskSolver::bitmask_word(word);
         }
 
-        BitmapSolver {
+        BitmaskSolver {
             bitmasks: bitmasks,
             words: dictionary,
         }
@@ -283,22 +283,22 @@ impl BitmapSolver {
         chars.dedup();
         let mut mask: u32 = 0;
         for c in chars.iter() {
-            mask |= BitmapSolver::bitmask_letter(c);
+            mask |= BitmaskSolver::bitmask_letter(c);
         }
         mask
     }
 }
 
-impl Solver for BitmapSolver {
+impl Solver for BitmaskSolver {
     fn solve(&self, puzzle: &Puzzle) -> Vec<String> {
-        let center_letter_mask = BitmapSolver::bitmask_letter(&puzzle.center_letter);
+        let center_letter_mask = BitmaskSolver::bitmask_letter(&puzzle.center_letter);
 
         // forbidden_letter_mask has 1 for every letter which must *not* be
         // used. We compute it by ORing together all the allowed words, and then
         // inverting.
         let mut forbidden_letter_mask: u32 = center_letter_mask;
         for letter in puzzle.outer_letters.iter() {
-            forbidden_letter_mask |= BitmapSolver::bitmask_letter(letter)
+            forbidden_letter_mask |= BitmaskSolver::bitmask_letter(letter)
         }
         forbidden_letter_mask = !forbidden_letter_mask;
 
@@ -332,7 +332,7 @@ fn main() {
     println!("building radix");
     let trie = RadixTrieSolver::new(dictionary.clone());
     println!("building bitmask");
-    let bitmask = BitmapSolver::new(dictionary.clone());
+    let bitmask = BitmaskSolver::new(dictionary.clone());
 
     let puzzle = load_puzzle_from_file("puzzle.txt").unwrap();
     println!("Puzzle: {}", puzzle.to_string());
