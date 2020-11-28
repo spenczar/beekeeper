@@ -227,22 +227,26 @@ impl RadixTrieNode {
 }
 
 struct BitmaskSolver {
-    bitmasks: Vec<u32>,
-    words: Vec<String>,
+    bitmasks: Vec<BitmaskedWord>,
+}
+
+struct BitmaskedWord {
+    mask: u32,
+    word: String,
 }
 
 impl BitmaskSolver {
     fn new(dictionary: Vec<String>) -> BitmaskSolver {
-        let mut bitmasks = vec![0; dictionary.len()];
+        let mut bitmasks = Vec::new();
 
-        for (idx, word) in dictionary.iter().enumerate() {
-            bitmasks[idx] = BitmaskSolver::bitmask_word(word);
+        for word in dictionary.iter() {
+            bitmasks.push(BitmaskedWord {
+                mask: BitmaskSolver::bitmask_word(word),
+                word: word.to_string(),
+            });
         }
 
-        BitmaskSolver {
-            bitmasks: bitmasks,
-            words: dictionary,
-        }
+        BitmaskSolver { bitmasks: bitmasks }
     }
 
     fn bitmask_letter(letter: &char) -> u32 {
@@ -303,10 +307,10 @@ impl Solver for BitmaskSolver {
         forbidden_letter_mask = !forbidden_letter_mask;
 
         let mut result: Vec<String> = Vec::new();
-        for (idx, mask) in self.bitmasks.iter().enumerate() {
-            if (mask & center_letter_mask != 0) && (mask & forbidden_letter_mask == 0) {
-                if self.words[idx].len() >= MIN_LENGTH {
-                    result.push(self.words[idx].to_string());
+        for mask in self.bitmasks.iter() {
+            if (mask.mask & center_letter_mask != 0) && (mask.mask & forbidden_letter_mask == 0) {
+                if mask.word.len() >= MIN_LENGTH {
+                    result.push(mask.word.to_string());
                 }
             }
         }
