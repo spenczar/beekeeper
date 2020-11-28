@@ -146,7 +146,7 @@ struct RadixTrieSolver {
 impl RadixTrieSolver {
     fn new(word_list: Vec<String>) -> RadixTrieSolver {
         let mut root = RadixTrieNode::new(false);
-        for word in word_list.iter() {
+        for word in word_list.iter().filter(|w| w.len() >= MIN_LENGTH) {
             root.add(word.clone());
         }
         RadixTrieSolver { dictionary: root }
@@ -202,7 +202,7 @@ impl RadixTrieNode {
     fn find_words(&self, puzzle: &Puzzle, center_letter_count: u32, path: &str) -> Vec<String> {
         let mut result = Vec::new();
 
-        if center_letter_count > 0 && self.is_word && path.len() >= MIN_LENGTH {
+        if center_letter_count > 0 && self.is_word {
             result.push(path.to_string());
         }
 
@@ -240,10 +240,12 @@ impl BitmaskSolver {
         let mut bitmasks = Vec::new();
 
         for word in dictionary.iter() {
-            bitmasks.push(BitmaskedWord {
-                mask: BitmaskSolver::bitmask_word(word),
-                word: word.to_string(),
-            });
+            if word.len() >= MIN_LENGTH {
+                bitmasks.push(BitmaskedWord {
+                    mask: BitmaskSolver::bitmask_word(word),
+                    word: word.to_string(),
+                });
+            }
         }
 
         BitmaskSolver { bitmasks: bitmasks }
@@ -309,13 +311,126 @@ impl Solver for BitmaskSolver {
         let mut result: Vec<String> = Vec::new();
         for mask in self.bitmasks.iter() {
             if (mask.mask & center_letter_mask != 0) && (mask.mask & forbidden_letter_mask == 0) {
-                if mask.word.len() >= MIN_LENGTH {
-                    result.push(mask.word.to_string());
-                }
+                result.push(mask.word.to_string());
             }
         }
 
         result
+    }
+}
+
+/*
+BlockBitmaskSolver is like BitmaskSolver, but with one layer of hierarchy: words
+in the dictionary are lexigraphically sorted and then split into "blocks" of
+fixed size. Each block has a shared block-level pair of bitmasks, indicating all
+characters that are shared by all words, and all characters that are present in
+at least one of the words.
+
+These block bitmasks can be consulted quickly to skip over large tranches of
+words. For example, if every word in a block has an "f" character, but "f" is
+not in the puzzle, then we can skip that block - none of its words will be
+valid. Likewise, if the center letter of a puzzle is "q", but none of the words
+in the block have a "q", then we can skip it.
+
+It's not immediately clear what the block size should be, so it is left
+configurable for now while I do some experimentation.
+*/
+struct BitmaskBlockSolver {
+    blocks: Vec<BitmaskBlock>,
+}
+
+impl BitmaskBlockSolver {
+    fn new(dictionary: Vec<String>, chunk_size: usize) -> BitmaskBlockSolver {
+        let mut blocks = Vec::new();
+        let mut sorted: Vec<String> = dictionary
+            .iter()
+            .filter(|w| w.len() >= MIN_LENGTH)
+            .cloned()
+            .collect();
+        sorted.sort();
+        for chunk in sorted.chunks(chunk_size) {
+            blocks.push(BitmaskBlock::new(chunk));
+        }
+        BitmaskBlockSolver { blocks: blocks }
+    }
+}
+
+impl Solver for BitmaskBlockSolver {
+    fn solve(&self, puzzle: &Puzzle) -> Vec<String> {
+        let center_letter_mask = BitmaskSolver::bitmask_letter(&puzzle.center_letter);
+
+        // forbidden_letter_mask has 1 for every letter which must *not* be
+        // used. We compute it by ORing together all the allowed words, and then
+        // inverting.
+        let mut forbidden_letter_mask: u32 = center_letter_mask;
+        for letter in puzzle.outer_letters.iter() {
+            forbidden_letter_mask |= BitmaskSolver::bitmask_letter(letter)
+        }
+        forbidden_letter_mask = !forbidden_letter_mask;
+
+        let mut result: Vec<String> = Vec::new();
+
+        for block in self.blocks.iter() {
+            if let Some(matches) = &mut block.matches(center_letter_mask, forbidden_letter_mask) {
+                result.append(matches);
+            }
+        }
+        result
+    }
+}
+
+struct BitmaskBlock {
+    // Mask encoding the characters present in all words in the block.
+    common_chars_mask: u32,
+    // Mask encoding the characters present in no words in the block.
+    missing_chars_mask: u32,
+    // The words present in the block.
+    words: Vec<BitmaskedWord>,
+}
+
+impl BitmaskBlock {
+    fn new(words: &[String]) -> BitmaskBlock {
+        let mut common_chars_mask: u32 = !0;
+        let mut missing_chars_mask: u32 = 0;
+        let mut masked_words = Vec::new();
+
+        for w in words.iter() {
+            let masked_word = BitmaskedWord {
+                mask: BitmaskSolver::bitmask_word(&w),
+                word: w.to_string(),
+            };
+            missing_chars_mask |= masked_word.mask;
+            common_chars_mask &= masked_word.mask;
+            masked_words.push(masked_word);
+        }
+
+        BitmaskBlock {
+            common_chars_mask: common_chars_mask,
+            missing_chars_mask: missing_chars_mask,
+            words: masked_words,
+        }
+    }
+
+    /// Returns the list of all words that match, if there are any matches. If
+    /// there aren't any, then returns None.
+    fn matches(&self, center_letter_mask: u32, forbidden_letter_mask: u32) -> Option<Vec<String>> {
+        if (self.common_chars_mask & forbidden_letter_mask) != 0 {
+            return None;
+        }
+        if (self.missing_chars_mask & center_letter_mask) == 0 {
+            return None;
+        }
+        let mut result: Vec<String> = Vec::new();
+        for w in self.words.iter() {
+            if (w.mask & center_letter_mask != 0) && (w.mask & forbidden_letter_mask == 0) {
+                result.push(w.word.to_string());
+            }
+        }
+        if result.len() == 0 {
+            return None;
+        } else {
+            return Some(result);
+        }
     }
 }
 
@@ -337,13 +452,35 @@ fn main() {
     let trie = RadixTrieSolver::new(dictionary.clone());
     println!("building bitmask");
     let bitmask = BitmaskSolver::new(dictionary.clone());
+    println!("building blockwise bitmask: 1");
+    let bitmask_block_1 = BitmaskBlockSolver::new(dictionary.clone(), 1);
+    println!("building blockwise bitmask: 5");
+    let bitmask_block_5 = BitmaskBlockSolver::new(dictionary.clone(), 5);
+    println!("building blockwise bitmask: 10");
+    let bitmask_block_10 = BitmaskBlockSolver::new(dictionary.clone(), 10);
+    println!("building blockwise bitmask: 20");
+    let bitmask_block_20 = BitmaskBlockSolver::new(dictionary.clone(), 20);
+    println!("building blockwise bitmask: 50");
+    let bitmask_block_50 = BitmaskBlockSolver::new(dictionary.clone(), 50);
+    println!("building blockwise bitmask: 100");
+    let bitmask_block_100 = BitmaskBlockSolver::new(dictionary.clone(), 100);
+    println!("building blockwise bitmask: 200");
+    let bitmask_block_200 = BitmaskBlockSolver::new(dictionary.clone(), 200);
+    println!("building blockwise bitmask: 1000");
+    let bitmask_block_1000 = BitmaskBlockSolver::new(dictionary.clone(), 1000);
 
     let puzzle = load_puzzle_from_file("puzzle.txt").unwrap();
     println!("Puzzle: {}", puzzle.to_string());
 
-    for _ in 1..100 {
-        benchmark_solver("naive", &naive, &puzzle);
-        benchmark_solver("trie", &trie, &puzzle);
-        benchmark_solver("bitmask", &bitmask, &puzzle);
-    }
+    benchmark_solver("naive", &naive, &puzzle);
+    benchmark_solver("trie", &trie, &puzzle);
+    benchmark_solver("bitmask", &bitmask, &puzzle);
+    benchmark_solver("bitmask-block-1", &bitmask_block_1, &puzzle);
+    benchmark_solver("bitmask-block-5", &bitmask_block_5, &puzzle);
+    benchmark_solver("bitmask-block-10", &bitmask_block_10, &puzzle);
+    benchmark_solver("bitmask-block-20", &bitmask_block_20, &puzzle);
+    benchmark_solver("bitmask-block-50", &bitmask_block_50, &puzzle);
+    benchmark_solver("bitmask-block-100", &bitmask_block_100, &puzzle);
+    benchmark_solver("bitmask-block-200", &bitmask_block_200, &puzzle);
+    benchmark_solver("bitmask-block-1000", &bitmask_block_1000, &puzzle);
 }
