@@ -11,6 +11,9 @@ const WORDS_FILE_PATH: &str = "/usr/share/dict/words";
 // Words must be at least 4 characters long to be valid answers.
 const MIN_LENGTH: usize = 4;
 
+// Initialize any result vectors with this capacity
+const TYPICAL_RESULT_SIZE: usize = 100;
+
 /// Load all the words from the unix dictionary.
 fn load_dictionary() -> io::Result<Vec<String>> {
     let file = File::open(WORDS_FILE_PATH)?;
@@ -125,7 +128,7 @@ impl NaiveSolver {
 
 impl Solver for NaiveSolver {
     fn solve(&self, puzzle: &Puzzle) -> Vec<String> {
-        let mut result: Vec<String> = Vec::new();
+        let mut result: Vec<String> = Vec::with_capacity(TYPICAL_RESULT_SIZE);
 
         for word in self.words.iter() {
             if word.len() < MIN_LENGTH {
@@ -167,7 +170,7 @@ impl RadixTrieNode {
     fn new(is_word: bool) -> RadixTrieNode {
         RadixTrieNode {
             is_word: is_word,
-            children: HashMap::new(),
+            children: HashMap::with_capacity(26),
         }
     }
 
@@ -200,7 +203,7 @@ impl RadixTrieNode {
     /// puzzle to be solved. path should be a String indicating the current set
     /// of letters visited, in order, including the current node's letter.
     fn find_words(&self, puzzle: &Puzzle, center_letter_count: u32, path: &str) -> Vec<String> {
-        let mut result = Vec::new();
+        let mut result = Vec::with_capacity(TYPICAL_RESULT_SIZE);
 
         if center_letter_count > 0 && self.is_word {
             result.push(path.to_string());
@@ -237,7 +240,7 @@ struct BitmaskedWord {
 
 impl BitmaskSolver {
     fn new(dictionary: Vec<String>) -> BitmaskSolver {
-        let mut bitmasks = Vec::new();
+        let mut bitmasks = Vec::with_capacity(dictionary.len());
 
         for word in dictionary.iter() {
             if word.len() >= MIN_LENGTH {
@@ -308,7 +311,7 @@ impl Solver for BitmaskSolver {
         }
         forbidden_letter_mask = !forbidden_letter_mask;
 
-        let mut result: Vec<String> = Vec::new();
+        let mut result: Vec<String> = Vec::with_capacity(TYPICAL_RESULT_SIZE);
         for mask in self.bitmasks.iter() {
             if (mask.mask & center_letter_mask != 0) && (mask.mask & forbidden_letter_mask == 0) {
                 result.push(mask.word.to_string());
@@ -341,7 +344,7 @@ struct BitmaskBlockSolver {
 
 impl BitmaskBlockSolver {
     fn new(dictionary: Vec<String>, chunk_size: usize) -> BitmaskBlockSolver {
-        let mut blocks = Vec::new();
+        let mut blocks = Vec::with_capacity(dictionary.len() / chunk_size + 1);
         let mut sorted: Vec<String> = dictionary
             .iter()
             .filter(|w| w.len() >= MIN_LENGTH)
@@ -368,7 +371,7 @@ impl Solver for BitmaskBlockSolver {
         }
         forbidden_letter_mask = !forbidden_letter_mask;
 
-        let mut result: Vec<String> = Vec::new();
+        let mut result: Vec<String> = Vec::with_capacity(TYPICAL_RESULT_SIZE);
 
         for block in self.blocks.iter() {
             if let Some(matches) = &mut block.matches(center_letter_mask, forbidden_letter_mask) {
@@ -392,7 +395,7 @@ impl BitmaskBlock {
     fn new(words: &[String]) -> BitmaskBlock {
         let mut common_chars_mask: u32 = !0;
         let mut missing_chars_mask: u32 = 0;
-        let mut masked_words = Vec::new();
+        let mut masked_words = Vec::with_capacity(words.len());
 
         for w in words.iter() {
             let masked_word = BitmaskedWord {
@@ -420,7 +423,7 @@ impl BitmaskBlock {
         if (self.missing_chars_mask & center_letter_mask) == 0 {
             return None;
         }
-        let mut result: Vec<String> = Vec::new();
+        let mut result: Vec<String> = Vec::with_capacity(self.words.len());
         for w in self.words.iter() {
             if (w.mask & center_letter_mask != 0) && (w.mask & forbidden_letter_mask == 0) {
                 result.push(w.word.to_string());
