@@ -77,34 +77,34 @@ impl Solver for NaiveSolver {
     }
 }
 
-pub struct RadixTrieSolver {
-    dictionary: RadixTrieNode,
+pub struct TrieSolver {
+    dictionary: TrieNode,
 }
 
-impl RadixTrieSolver {
-    pub fn new(word_list: Vec<String>) -> RadixTrieSolver {
-        let mut root = RadixTrieNode::new(false);
+impl TrieSolver {
+    pub fn new(word_list: Vec<String>) -> TrieSolver {
+        let mut root = TrieNode::new(false);
         for word in word_list.iter().filter(|w| w.len() >= MIN_LENGTH) {
             root.add(word.clone());
         }
-        RadixTrieSolver { dictionary: root }
+        TrieSolver { dictionary: root }
     }
 }
 
-impl Solver for RadixTrieSolver {
+impl Solver for TrieSolver {
     fn solve(&self, puzzle: &Puzzle) -> Vec<String> {
         self.dictionary.find_words(puzzle, 0, "")
     }
 }
 
-struct RadixTrieNode {
+struct TrieNode {
     is_word: bool,
-    children: HashMap<char, RadixTrieNode>,
+    children: HashMap<char, TrieNode>,
 }
 
-impl RadixTrieNode {
-    fn new(is_word: bool) -> RadixTrieNode {
-        RadixTrieNode {
+impl TrieNode {
+    fn new(is_word: bool) -> TrieNode {
+        TrieNode {
             is_word: is_word,
             children: HashMap::with_capacity(26),
         }
@@ -123,7 +123,7 @@ impl RadixTrieNode {
             }
         } else {
             // No child, so make a new one
-            let mut child = RadixTrieNode::new(word.len() == 0);
+            let mut child = TrieNode::new(word.len() == 0);
             // More to go
             if word.len() > 0 {
                 child.add(word);

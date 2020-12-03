@@ -3,7 +3,7 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion, Benchmark
 use std::fs::File;
 use std::io;
 use std::io::BufRead;
-use beekeeper::{Puzzle, Solver, NaiveSolver, BitmaskSolver, BitmaskBlockSolver, RadixTrieSolver};
+use beekeeper::{Puzzle, Solver, NaiveSolver, BitmaskSolver, BitmaskBlockSolver, TrieSolver};
 
 
 const WORDS_FILE_PATH: &str = "/usr/share/dict/words";
@@ -23,7 +23,7 @@ fn load_dictionary() -> io::Result<Vec<String>> {
 pub fn benchmark_solvers(c: &mut Criterion) {
     let dictionary = load_dictionary().unwrap();
     let naive = NaiveSolver::new(dictionary.clone());
-    let trie = RadixTrieSolver::new(dictionary.clone());
+    let trie = TrieSolver::new(dictionary.clone());
     let bitmask = BitmaskSolver::new(dictionary.clone());
     let bitmask_block = BitmaskBlockSolver::new(dictionary.clone(), 50);
     let mut group = c.benchmark_group("Bee solvers");
@@ -58,5 +58,5 @@ pub fn benchmark_block_size(c: &mut Criterion) {
     }
 }
 
-criterion_group!(benches, benchmark_block_size);
+criterion_group!(benches, benchmark_solvers);
 criterion_main!(benches);

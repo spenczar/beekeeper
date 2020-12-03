@@ -2,7 +2,7 @@ use std::fs::{read_to_string, File};
 use std::io;
 use std::io::BufRead;
 
-use beekeeper::{Puzzle, Solver, NaiveSolver, BitmaskSolver, BitmaskBlockSolver, RadixTrieSolver};
+use beekeeper::{Puzzle, Solver, NaiveSolver, BitmaskSolver, BitmaskBlockSolver, TrieSolver};
 
 const WORDS_FILE_PATH: &str = "/usr/share/dict/words";
 
@@ -39,8 +39,8 @@ fn main() {
     let dictionary = load_dictionary().unwrap();
     println!("building native");
     let naive = NaiveSolver::new(dictionary.clone());
-    println!("building radix");
-    let trie = RadixTrieSolver::new(dictionary.clone());
+    println!("building trie");
+    let trie = TrieSolver::new(dictionary.clone());
     println!("building bitmask");
     let bitmask = BitmaskSolver::new(dictionary.clone());
     println!("building blockwise bitmask (50-size blocks)");
@@ -69,7 +69,7 @@ fn benchmark_solver(label: &str, solver: &impl Solver, puzzle: &Puzzle) {
 fn test_trie_solver() {
     let dictionary = load_dictionary().unwrap();
     let naive = NaiveSolver::new(dictionary.clone());
-    let trie = RadixTrieSolver::new(dictionary.clone());
+    let trie = TrieSolver::new(dictionary.clone());
     let puzzle = Puzzle {
         center_letter: 'a',
         outer_letters: ['b', 'c', 'd', 'e', 'f', 'g'],
