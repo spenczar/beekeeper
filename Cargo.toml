@@ -8,3 +8,10 @@ edition = "2018"
 
 [dependencies]
 chrono = "0.4"
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "solvers"
+harness = false
